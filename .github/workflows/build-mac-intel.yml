@@ -1,0 +1,58 @@
+name: Crea Metrica per Mac Intel
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'mac-v*'
+permissions:
+  contents: read
+concurrency:
+  group: metrica-mac-build
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '13.0'
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Prepara Rust sul runner
+        run: |
+          rustup update stable --no-self-update
+          rustup default stable
+          rustup target add x86_64-apple-darwin
+      - run: npm ci
+      - run: npm test
+      - name: Genera le icone native dalla PWA
+        run: npm run tauri -- icon icons/icon-512.png
+      - name: Compila app e DMG Intel
+        run: npm run build:mac
+      - name: Verifica architettura, versione minima e firma ad hoc
+        run: |
+          set -euo pipefail
+          APP="src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Metrica.app"
+          BIN="$APP/Contents/MacOS/metrica"
+          test "$(lipo -archs "$BIN")" = "x86_64"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP/Contents/Info.plist")" = "13.0"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          otool -l "$BIN" > build-load-commands.txt
+          python3 scripts/check-macos.py "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" Metrica-1.0.0-mac-Intel.app.zip
+          shasum -a 256 src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg Metrica-1.0.0-mac-Intel.app.zip > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Metrica-1.0.0-mac-Intel
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+            Metrica-1.0.0-mac-Intel.app.zip
+            SHA256SUMS.txt
+            build-load-commands.txt
+            src-tauri/Cargo.lock
