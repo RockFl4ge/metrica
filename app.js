@@ -1,3 +1,4 @@
+import {isDesktop,confirmAction,saveArchive,pickArchive} from './desktop.js';
 import {SPORTS,DEFAULT_PROFILE,makeDemo,emptyState,normalizeState,todayISO,dateObj,dateLabel,round,bmr,getWeightOn,dailyReport,calculateModel,bmi,sportMetric,sportMetricsFor,sportMetricDefs,caloriesForSport,humorousMessage} from './core.js';
 const KEY='metrica_v1_personal_archive';
 const app=document.getElementById('app');
@@ -29,18 +30,18 @@ const parseNum=v=>v===''||v===null||v===undefined?null:Number.isFinite(Number(v)
 const avg=xs=>xs.length?xs.reduce((a,b)=>a+b,0)/xs.length:null;
 const pace=v=>Number.isFinite(v)&&v>0?`${Math.floor(Math.round(v)/60)}:${String(Math.round(v)%60).padStart(2,'0')}`:'—';
 let store;
-try{const x=localStorage.getItem(KEY);store=x?normalizeState(JSON.parse(x)):makeDemo();if(x)store.mode='personal';}catch(e){store=makeDemo();}
+try{const x=localStorage.getItem(KEY);store=x?normalizeState(JSON.parse(x)):(isDesktop()?emptyState():makeDemo());if(x)store.mode='personal';}catch(e){store=isDesktop()?emptyState():makeDemo();}
 let ui={view:'home',dayDate:store.mode==='demo'?store.days.at(-1)?.date||todayISO():todayISO(),sportKind:'running',sportMetric:'distance',sportPeriod:'all',listSportFilter:'all',analysisMetric:'weight',sportDraft:null,sportEditing:null,suggested:false};
 let toastTimeout;
 function notify(message){const node=document.getElementById('toast');node.textContent=message;node.classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>node.classList.remove('show'),3500);}
-function persist(){try{localStorage.setItem(KEY,JSON.stringify(store));return true;}catch(e){notify('Memoria del browser non disponibile. Esporta un backup JSON.');return false;}}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(store));return true;}catch(e){notify('Memoria del dispositivo non disponibile. Esporta un backup JSON.');return false;}}
 function navTo(id){ui.view=id;ui.sportEditing=null;ui.sportDraft=null;render();window.scrollTo({top:0,behavior:'auto'});}
 const navItems=[['home','home','Home'],['journal','book','Diario'],['sports','activity','Sport'],['analysis','chart','Analisi'],['settings','settings','Impostazioni']];
 function shell(content){
  const nav=navItems.map(([id,icon,label])=>`<button type="button" class="${ui.view===id?'active':''}" data-nav="${id}">${ic(icon)}<span>${label}</span></button>`).join('');
  const demo=store.mode==='demo'?`<span class="tag warn">Dati demo</span>`:`<span class="tag neutral">Archivio locale</span>`;
  return `<div class="app-shell"><aside class="sidebar"><div class="brand"><div class="brand-icon">M</div><div><h2>metrica.</h2><span>diario & performance</span></div></div>
- <nav class="nav">${nav}</nav><div class="side-bottom"><div class="side-note"><strong>${ic('shield')} Privacy prima di tutto</strong>Le informazioni rimangono nel browser. Esporta periodicamente un backup.</div><div class="side-user"><div class="avatar">M</div><div><strong style="color:#e8eee9">Profilo personale</strong><div style="color:#8096a6;margin-top:3px">Metrica 1.0</div></div></div></div></aside>
+ <nav class="nav">${nav}</nav><div class="side-bottom"><div class="side-note"><strong>${ic('shield')} Privacy prima di tutto</strong>Le informazioni rimangono sul dispositivo. Esporta periodicamente un backup.</div><div class="side-user"><div class="avatar">M</div><div><strong style="color:#e8eee9">Profilo personale</strong><div style="color:#8096a6;margin-top:3px">Metrica 1.0</div></div></div></div></aside>
  <main class="main"><header class="topbar"><div class="crumb">METRICA <span style="color:#bdc6cb;margin:0 9px">/</span><b>${navItems.find(x=>x[0]===ui.view)?.[2]}</b></div><div class="top-actions">${demo}<div class="date-chip">${ic('calendar')}${dateLabel(todayISO(),{day:'numeric',month:'long'})}</div><button class="head-cta" data-nav="journal">${ic('plus')} Registra giornata</button></div></header><div class="main-inner">${content}<div class="footer-note">Metrica v1.0 · Stime energetiche indicative · Archivio memorizzato esclusivamente sul dispositivo</div></div></main>
  <nav class="mobile-bar">${nav}</nav></div>`;
 }
@@ -106,7 +107,7 @@ function activityRow(s){const meta=SPORTS[s.kind]||SPORTS.other,w=getWeightOn(s.
 function journal(){
  const date=ui.dayDate,day=store.days.find(d=>d.date===date)||{date},report=dailyReport(date,store.days,store.sports,store.profile);
  const dates=[...store.days].sort((a,b)=>b.date.localeCompare(a.date));
- return `${head('REGISTRAZIONE QUOTIDIANA','Diario alimentare','Calorie, macronutrienti, passi e peso in un’unica scheda. Le calorie consumate sono distinte dal bilancio energetico.')}${demoNotice()}
+ return `${head('REGISTRAZIONE QUOTIDIANA','Diario alimentare','Calorie, macronutrienti, passi e peso in un\'unica scheda. Le calorie consumate sono distinte dal bilancio energetico.')}${demoNotice()}
  <div class="grid grid-home" style="margin-top:${store.mode==='demo'?'17px':'0'}"><section class="card"><div class="card-top"><div><div class="card-title">Registra o modifica una giornata</div><div class="card-sub">Le celle vuote rimangono non registrate, non diventano zero.</div></div>${button('Oggi','day-today','tiny')}</div>
  <form id="day-form"><div class="form-grid">${field('day-date','Data',date,'required','date')}${field('day-calories','Calorie assunte (kcal)',day.calories,'placeholder="es. 2050"')}</div>
  <div class="form-section">Macronutrienti · facoltativi</div><div class="form-grid three">${field('day-protein','Proteine (g)',day.protein)}${field('day-carbs','Carboidrati (g)',day.carbs)}${field('day-fat','Grassi (g)',day.fat)}${field('day-fiber','Fibre (g)',day.fiber)}</div>
@@ -117,7 +118,7 @@ function journal(){
  <section class="section-stack"><div class="card"><div class="card-top"><div><div class="card-title">Bilancio · ${dateLabel(date)}</div><div class="card-sub">Calcolato sui dati attualmente salvati</div></div><span class="tag ${report.legacy?'warn':''}">${report.legacy?'Metodo storico':'TDEE dinamico'}</span></div>
  ${[['Metabolismo basale',report.bmr],['Dispendio di riferimento',report.base],['Variazione dai passi',report.stepsEnergy],['Attività sportive extra',report.sportEnergy],['TDEE complessivo',report.tdee]].map(([k,v],i)=>`<div class="splitline"><span>${k}</span><b class="number">${i===2||i===3?sign(Math.round(v)):num(Math.round(v))} kcal</b></div>`).join('')}
  <div class="divider"></div><div class="splitline"><strong>Bilancio netto</strong><strong class="number ${report.balance===null?'':report.balance<0?'color-green':'color-orange'}">${report.balance===null?'—':`${sign(Math.round(report.balance))} kcal`}</strong></div>
- <div class="tip">${report.legacy?'Dato storico: il TDEE originario dell’Excel è conservato finché non registri nuovi passi o chilometri per questo giorno.':'Il dispendio è una stima: parte dal BMR, aggiunge movimento e sport senza duplicare le attività segnate come incluse nei passi.'}</div></div>
+ <div class="tip">${report.legacy?'Dato storico: il TDEE originario dell\'Excel è conservato finché non registri nuovi passi o chilometri per questo giorno.':'Il dispendio è una stima: parte dal BMR, aggiunge movimento e sport senza duplicare le attività segnate come incluse nei passi.'}</div></div>
  <div class="card"><div class="card-top"><div><div class="card-title">Sport nello stesso giorno</div><div class="card-sub">${dateLabel(date)}</div></div>${button(`${ic('plus')} Attività`,'add-sport-from-day','tiny')}</div>${report.sports.length?report.sports.map(activityRow).join(''):emptyGraph('Nessuno sport registrato','Le attività verranno sommate automaticamente al dispendio della giornata.')}</div></section></div>
  <section class="card" style="margin-top:20px"><div class="card-top"><div><div class="card-title">Storico alimentare</div><div class="card-sub">Seleziona una data per aprirla nel diario</div></div><span class="tag neutral">${dates.length} giornate</span></div>
  ${dates.length?`<div class="table-wrap"><table class="data-table"><thead><tr><th>Data</th><th>Calorie</th><th>Proteine</th><th>Passi</th><th>Peso</th><th>Bilancio</th><th></th></tr></thead><tbody>${dates.slice(0,40).map(d=>{
@@ -137,8 +138,8 @@ function sportForm(){
  <div id="sport-derived" class="small-note" style="margin-top:12px">Velocità e passo medio verranno calcolati da distanza e tempo in movimento.</div><div class="form-section">Consumo energetico</div><div class="form-grid">${field('sport-kcal','Calorie inserite manualmente',d.calories,'placeholder="vuoto = stima automatica"')}${selectField('sport-intensity','Intensità', [['light','Leggera'],['moderate','Moderata'],['vigorous','Intensa']],d.intensity)}</div>
  <div class="form-grid" style="margin-top:14px">${selectField('sport-kcal-type','Tipo di calorie inserite',[['active','Attive / aggiuntive'],['total','Totali della sessione']],d.caloriesType)}</div>
  <div class="tip" style="margin-top:14px">Stima indicativa se lasci le calorie vuote: <strong id="sport-estimated">${d.movingMin>0?`${num(estimate)} kcal attive`:'inserisci la durata'}</strong>. Basata su MET e intensità; per bici e corsa considera anche la velocità ricavata. Non è una misura diretta.</div>
- ${showDistance&&['running','walking','hiking'].includes(d.kind)?`<div class="form-section">Passi e sovrapposizioni</div><label class="checkbox-row"><input type="checkbox" id="sport-included" ${d.includedInSteps?'checked':''}> I passi di questa attività sono già nel totale del telefono</label><div class="form-grid" style="margin-top:12px">${field('sport-activity-steps','Passi dell’attività (se noti)',d.activitySteps,'placeholder="altrimenti stimati dai km"')}</div>`:''}
- <div class="form-section">Note</div>${safeTextArea('sport-notes','Note sull’attività',d.notes)}
+ ${showDistance&&['running','walking','hiking'].includes(d.kind)?`<div class="form-section">Passi e sovrapposizioni</div><label class="checkbox-row"><input type="checkbox" id="sport-included" ${d.includedInSteps?'checked':''}> I passi di questa attività sono già nel totale del telefono</label><div class="form-grid" style="margin-top:12px">${field('sport-activity-steps','Passi dell\'attività (se noti)',d.activitySteps,'placeholder="altrimenti stimati dai km"')}</div>`:''}
+ <div class="form-section">Note</div>${safeTextArea('sport-notes','Note sull\'attività',d.notes)}
  <div class="btn-row" style="margin-top:18px"><button class="btn primary" type="submit">${ic('check')} ${ui.sportEditing?'Salva modifiche':'Aggiungi attività'}</button>${ui.sportEditing?button('Annulla modifica','cancel-sport','') : ''}</div></form></section>`;
 }
 function sportChart(){
@@ -165,7 +166,7 @@ function sportsPage(){
  ${shown.length?`<div class="table-wrap"><table class="data-table"><thead><tr><th>Data</th><th>Disciplina</th><th>Distanza</th><th>Movimento</th><th>Passo / velocità</th><th>Dislivello</th><th>Calorie</th><th>Azioni</th></tr></thead><tbody>${shown.slice(0,75).map(s=>{
  const k=SPORTS[s.kind],pacing=s.kind==='running'||s.kind==='hiking'||s.kind==='swimming'?pace(sportMetric(s,'pace'))+(s.distanceKm&&s.movingMin?' min/km':''):num(sportMetric(s,'speed'),1)+(s.distanceKm&&s.movingMin?' km/h':'');
  return `<tr><td>${dateLabel(s.date)}</td><td><strong>${k.emoji} ${esc(k.label)}</strong></td><td>${num(s.distanceKm,2)} km</td><td>${num(s.movingMin)}${s.elapsedMin?` / ${num(s.elapsedMin)}`:''} min</td><td>${s.distanceKm&&s.movingMin?pacing:'—'}</td><td>${num(s.elevationM)} m</td><td>${num(caloriesForSport(s,getWeightOn(s.date,store.days,store.profile),store.profile))} kcal</td><td><div class="btn-row"><button type="button" title="Modifica" class="icon-btn" data-sport-edit="${esc(s.id)}">${ic('edit')}</button><button type="button" title="Elimina" class="icon-btn" data-sport-delete="${esc(s.id)}">${ic('trash')}</button></div></td></tr>`;
- }).join('')}</tbody></table></div>`:emptyGraph('Diario sportivo vuoto','Registra un’attività per iniziare a costruire uno storico.')}</section>`;
+ }).join('')}</tbody></table></div>`:emptyGraph('Diario sportivo vuoto','Registra un\'attività per iniziare a costruire uno storico.')}</section>`;
 }
 function analysis(){
  const p=store.profile,weightEntries=store.days.filter(d=>Number.isFinite(d.weight)).sort((a,b)=>a.date.localeCompare(b.date));
@@ -184,7 +185,7 @@ function analysis(){
  }else{
    rows=dayRows;series=[{key:metric,label:{calories:'Calorie introdotte',tdee:'TDEE stimato',balance:'Bilancio energetico',steps:'Passi registrati'}[metric],color:'#36a787',unit:metric==='steps'?'passi':'kcal'}];
    title={calories:'Calorie introdotte',tdee:'TDEE giornaliero',balance:'Bilancio energetico',steps:'Passi quotidiani'}[metric];
-   sub='L’andamento comprende le sole giornate compilate; nessun valore è inventato per le date mancanti.';
+   sub='L\'andamento comprende le sole giornate compilate; nessun valore è inventato per le date mancanti.';
  }
  const completed=dayRows.slice(-7),meanBalance=avg(completed.map(d=>d.balance).filter(x=>Number.isFinite(x)));
  const lastWeight=latest?.weight,delta=latest&&early&&latest!==early?latest.weight-early.weight:null;
@@ -197,7 +198,7 @@ function analysis(){
  ${[['Peso di partenza del modello',`${num(p.modelAnchorWeightKg,1)} kg`],['Data di riferimento',dateLabel(p.modelAnchorDate)],['Giornate calcolate',`${model.length}`],['Ultimo peso teorico',lastModel?`${num(lastModel.estimatedWeight,2)} kg`:'—'],['Energia teorica / kg','7.700 kcal/kg']].map(([l,v])=>`<div class="splitline"><span>${l}</span><b>${v}</b></div>`).join('')}
  <div class="tip" style="margin-top:14px">Il modello integra il bilancio energetico solo nei giorni registrati. Periodi non compilati possono rendere inaffidabile il confronto: per una nuova fase puoi aggiornare la data e il peso iniziali nelle Impostazioni.</div></section>
  <section class="card"><div class="card-title" style="margin-bottom:15px">Interpretazione dei risultati</div><div class="section-stack" style="gap:15px"><div class="splitline"><span>BMI più recente</span><b>${latest?num(bmi(lastWeight,p.heightCm),1):'—'}</b></div><div class="splitline"><span>Pesate registrate</span><b>${weightEntries.length}</b></div><div class="splitline"><span>Giornate alimentari</span><b>${dayRows.length}</b></div><div class="splitline"><span>Sessioni sportive</span><b>${store.sports.length}</b></div>
- <div class="notice"><strong>Attenzione al significato fisico.</strong> La variazione energetica / 7.700 rappresenta un'equivalenza semplificata: non misura direttamente il grasso corporeo. Acqua, glicogeno, massa magra e adattamenti metabolici possono spiegare scostamenti importanti. Il BMI non misura la percentuale di grasso.</div></div></section></div>
+ <div class="notice"><strong>Attenzione al significato fisico.</strong> La variazione energetica / 7.700 rappresenta un\'equivalenza semplificata: non misura direttamente il grasso corporeo. Acqua, glicogeno, massa magra e adattamenti metabolici possono spiegare scostamenti importanti. Il BMI non misura la percentuale di grasso.</div></div></section></div>
  </div>`;
 }
 function settings(){
@@ -210,14 +211,14 @@ function settings(){
  <div class="form-section">Calcolo dinamico del TDEE</div><div class="form-grid">${field('profile-factor','Fattore sedentario BMR ×',p.baseActivityFactor,'required','number','Valore iniziale 1,20; comprende attività ordinarie e termogenesi stimata.')}${field('profile-baseline-steps','Passi già compresi nel riferimento',p.baselineSteps,'required','number','Variazioni sopra/sotto questo valore modificano il consumo.')}${field('profile-walking-cost','Costo netto camminata (kcal/kg/km)',p.walkingKcalKgKm,'required','number','Coefficiente approssimativo iniziale 0,45.')}</div>
  <div class="form-section">Punto di partenza della previsione del peso</div><div class="form-grid">${field('profile-anchor-date','Data di inizio modello',p.modelAnchorDate,'required','date')}${field('profile-anchor-weight','Peso teorico iniziale (kg)',p.modelAnchorWeightKg,'required')}</div>
  <p class="small-note" style="margin-top:12px">Se riparti dopo un lungo periodo senza registrazioni, imposta una nuova data di riferimento e il peso misurato in quel momento. Le registrazioni precedenti restano archiviate, ma non entrano nella nuova previsione.</p>
- <div class="btn-row" style="margin-top:21px"><button type="submit" class="btn primary">${ic('check')} Salva impostazioni</button>${button('Ancora dall’ultima pesata','anchor-latest','')}</div></form></section>
- <div class="section-stack"><section class="card"><div class="card-title">Backup e importazione</div><div class="card-sub">Un backup JSON permette di trasferire l’archivio tra dispositivi, senza pubblicarlo.</div>
+ <div class="btn-row" style="margin-top:21px"><button type="submit" class="btn primary">${ic('check')} Salva impostazioni</button>${button('Ancora dall\'ultima pesata','anchor-latest','')}</div></form></section>
+ <div class="section-stack"><section class="card"><div class="card-title">Backup e importazione</div><div class="card-sub">Un backup JSON permette di trasferire l\'archivio tra dispositivi, senza pubblicarlo.</div>
  <div class="section-stack" style="margin-top:17px;gap:11px">${button(`${ic('download')} Esporta dati in JSON`,'export-json','full')}
  <button type="button" class="btn full" id="import-trigger">${ic('upload')} Importa archivio JSON</button>
  <input type="file" id="import-file" class="file-input" accept=".json,application/json">
- <div class="notice"><strong>Privacy:</strong> non inserire il file con lo storico personale nel repository GitHub pubblico. Importalo soltanto nell'app dal tuo dispositivo. I dati salvati nel browser possono scomparire cancellando i dati del sito.</div></div></section>
- <section class="card"><div class="card-title">Gestione dell’archivio</div><div class="card-sub">Il reset cancella l'archivio locale corrente.</div><div class="splitline"><span>Giornate</span><b>${store.days.length}</b></div><div class="splitline"><span>Sport</span><b>${store.sports.length}</b></div><div class="btn-row" style="margin-top:15px">${button('Archivio vuoto','reset-empty','danger')}${button('Carica dati demo','reset-demo','')}</div></section>
- <section class="card"><div class="card-title">Metodologia e fonti</div><p class="small-note" style="margin-top:11px">BMR: Mifflin-St Jeor. Attività: stime approssimative ispirate al 2024 Adult Compendium of Physical Activities, con MET legati al tipo e all'intensità. Consumo di camminata, livello sedentario e soglia passi sono ipotesi modificabili. Il modello energetico utilizza 7.700 kcal/kg solo come indicatore teorico.</p>
+ <div class="notice"><strong>Privacy:</strong> non inserire il file con lo storico personale nel repository GitHub pubblico. Importalo soltanto nell\'app dal tuo dispositivo. I dati salvati sul dispositivo possono scomparire rimuovendo l'archivio locale.</div></div></section>
+ <section class="card"><div class="card-title">Gestione dell\'archivio</div><div class="card-sub">Il reset cancella l\'archivio locale corrente.</div><div class="splitline"><span>Giornate</span><b>${store.days.length}</b></div><div class="splitline"><span>Sport</span><b>${store.sports.length}</b></div><div class="btn-row" style="margin-top:15px">${button('Archivio vuoto','reset-empty','danger')}${button('Carica dati demo','reset-demo','')}</div></section>
+ <section class="card"><div class="card-title">Metodologia e fonti</div><p class="small-note" style="margin-top:11px">BMR: Mifflin-St Jeor. Attività: stime approssimative ispirate al 2024 Adult Compendium of Physical Activities, con MET legati al tipo e all\'intensità. Consumo di camminata, livello sedentario e soglia passi sono ipotesi modificabili. Il modello energetico utilizza 7.700 kcal/kg solo come indicatore teorico.</p>
  <p class="small-note" style="margin-top:10px"><a href="https://pacompendium.com/adult-compendium/" target="_blank" rel="noopener noreferrer">Catalogo MET</a> · <a href="https://www.niddk.nih.gov/bwp" target="_blank" rel="noopener noreferrer">NIH Body Weight Planner</a></p></section></div></div>`;
 }
 function render(){
@@ -276,8 +277,13 @@ function saveProfile(form){
  if(['macroProtein','macroCarbs','macroFat'].some(k=>!(p[k]>0))){notify('I target dei macronutrienti devono essere positivi.');return;}
  personalIfDemo();store.profile=p;persist();notify('Impostazioni aggiornate.');render();
 }
-function downloadJson(){
- const contents=JSON.stringify({...store,schemaVersion:1,mode:'personal'},null,2),blob=new Blob([contents],{type:'application/json'}),url=URL.createObjectURL(blob);
+async function downloadJson(){
+ const contents=JSON.stringify({...store,schemaVersion:1,mode:'personal'},null,2);
+ if(isDesktop()){
+  try { if(await saveArchive(contents,'metrica-backup-'+todayISO()+'.json'))notify('Backup esportato. Conserva il file in un luogo sicuro.'); }
+  catch(e){notify('Esportazione non riuscita: '+(e.message||e));} return;
+ }
+ const blob=new Blob([contents],{type:'application/json'}),url=URL.createObjectURL(blob);
  const a=document.createElement('a');a.href=url;a.download=`metrica-backup-${todayISO()}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);notify('Backup esportato. Conserva il file in un luogo sicuro.');
 }
 async function importJson(file){
@@ -285,8 +291,8 @@ async function importJson(file){
  if(file.size>15_000_000){notify('File troppo grande.');return;}
  try{
  const raw=JSON.parse(await file.text()),newState=normalizeState(raw);
- if(!window.confirm(`Importare ${newState.days.length} giornate e ${newState.sports.length} attività? L’archivio attuale verrà sostituito.`))return;
- store=newState;ui.dayDate=todayISO();ui.sportKind=newState.sports.at(-1)?.kind||'running';ui.sportMetric=sportMetricsFor(ui.sportKind)[0];ui.view='home';persist();render();notify('Storico importato correttamente.');
+ if(!await confirmAction(`Importare ${newState.days.length} giornate e ${newState.sports.length} attività? L\'archivio attuale verrà sostituito.`))return;
+ const previous=store;store=newState;if(!persist()){store=previous;return;}ui.dayDate=todayISO();ui.sportKind=newState.sports.at(-1)?.kind||'running';ui.sportMetric=sportMetricsFor(ui.sportKind)[0];ui.view='home';render();notify('Storico importato correttamente.');
  }catch(e){notify(`Importazione non riuscita: ${e.message}`);}
 }
 app.addEventListener('submit',event=>{
@@ -322,12 +328,16 @@ app.addEventListener('change',event=>{
  if(event.target.closest('#sport-form'))updateSportPreview();
  if(id==='import-file')importJson(event.target.files?.[0]);
 });
-app.addEventListener('click',event=>{
+app.addEventListener('click',async event=>{
  const nav=event.target.closest('[data-nav]');if(nav){navTo(nav.dataset.nav);return;}
  const dateBtn=event.target.closest('[data-date]');if(dateBtn){ui.dayDate=dateBtn.dataset.date;navTo('journal');return;}
  const ebtn=event.target.closest('[data-sport-edit]');if(ebtn){const s=store.sports.find(x=>x.id===ebtn.dataset.sportEdit);if(s){ui.sportEditing=s.id;ui.sportDraft={...s};ui.sportKind=s.kind;ui.view='sports';render();document.getElementById('sport-entry')?.scrollIntoView({behavior:'smooth'});}return;}
- const dbtn=event.target.closest('[data-sport-delete]');if(dbtn){if(window.confirm('Eliminare questa attività dal diario sportivo?')){store.sports=store.sports.filter(s=>s.id!==dbtn.dataset.sportDelete);persist();render();notify('Attività eliminata.');}return;}
- if(event.target.closest('#import-trigger')){document.getElementById('import-file')?.click();return;}
+ const dbtn=event.target.closest('[data-sport-delete]');if(dbtn){if(await confirmAction('Eliminare questa attività dal diario sportivo?')){store.sports=store.sports.filter(s=>s.id!==dbtn.dataset.sportDelete);persist();render();notify('Attività eliminata.');}return;}
+ if(event.target.closest('#import-trigger')){
+ if(isDesktop()){try{await importJson(await pickArchive());}catch(e){notify('Importazione non riuscita: '+(e.message||e));}}
+ else document.getElementById('import-file')?.click();
+ return;
+}
  const act=event.target.closest('[data-action]')?.dataset.action;
  if(!act)return;
  if(act==='go-journal'){navTo('journal');return;}
@@ -336,30 +346,30 @@ app.addEventListener('click',event=>{
  if(act==='day-today'){ui.dayDate=todayISO();render();return;}
  if(act==='add-sport-from-day'){ui.sportDraft={...sportDraft(),date:ui.dayDate};ui.sportEditing=null;ui.view='sports';render();document.getElementById('sport-entry')?.scrollIntoView({behavior:'smooth'});return;}
  if(act==='delete-day'){
-   if(window.confirm(`Eliminare la registrazione del ${dateLabel(ui.dayDate)}? Gli sport di quel giorno resteranno salvati.`)){
+   if(await confirmAction(`Eliminare la registrazione del ${dateLabel(ui.dayDate)}? Gli sport di quel giorno resteranno salvati.`)){
      store.days=store.days.filter(d=>d.date!==ui.dayDate);persist();render();notify('Giornata eliminata.');
    }return;
  }
  if(act==='cancel-sport'){ui.sportDraft=null;ui.sportEditing=null;render();return;}
- if(act==='export-json'){downloadJson();return;}
+ if(act==='export-json'){await downloadJson();return;}
  if(act==='anchor-latest'){
    const latest=[...store.days].filter(d=>Number.isFinite(d.weight)).sort((a,b)=>b.date.localeCompare(a.date))[0];
    if(!latest){notify('Non ci sono pesate registrate.');return;}
-   if(!window.confirm(`Usare ${num(latest.weight,1)} kg alla data ${dateLabel(latest.date)} come nuovo punto di partenza?`))return;
+   if(!await confirmAction(`Usare ${num(latest.weight,1)} kg alla data ${dateLabel(latest.date)} come nuovo punto di partenza?`))return;
    personalIfDemo();store.profile.modelAnchorDate=latest.date;store.profile.modelAnchorWeightKg=latest.weight;persist();render();notify('Punto di partenza aggiornato.');return;
  }
  if(act==='personal-start'||act==='reset-empty'){
-   if(window.confirm('Creare un archivio personale vuoto? I dati attuali saranno sostituiti. Esporta prima un backup se vuoi conservarli.')){
+   if(await confirmAction('Creare un archivio personale vuoto? I dati attuali saranno sostituiti. Esporta prima un backup se vuoi conservarli.')){
      store=emptyState();ui.dayDate=todayISO();ui.sportDraft=null;ui.sportEditing=null;ui.view='home';persist();render();notify('Archivio personale pronto.');
    }return;
  }
  if(act==='reset-demo'){
-   if(window.confirm('Sostituire i tuoi dati locali con un archivio dimostrativo?')){
+   if(await confirmAction('Sostituire i tuoi dati locali con un archivio dimostrativo?')){
      store=makeDemo();ui.dayDate=store.days.at(-1).date;ui.view='home';localStorage.removeItem(KEY);render();notify('Modalità demo attivata.');
    }return;
  }
 });
-if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')){
+if(!isDesktop() && 'serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')){
  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 }
 render();

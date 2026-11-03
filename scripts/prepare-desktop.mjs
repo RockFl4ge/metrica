@@ -1,0 +1,11 @@
+import {mkdir,copyFile,readFile,writeFile,rm} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+const root = fileURLToPath(new URL('../',import.meta.url));
+const dist = new URL('../dist/',import.meta.url);
+await rm(dist,{recursive:true,force:true});
+await mkdir(new URL('icons/',dist),{recursive:true});
+const assets=['app.js','core.js','desktop.js','styles.css','icons/icon-192.png','icons/icon-512.png','icons/favicon.svg'];
+for(const file of assets)await copyFile(root+file,new URL(file,dist));
+const html=(await readFile(root+'index.html','utf8')).replace(/<link rel="manifest"[^>]*>/,'');
+await writeFile(new URL('index.html',dist),html);
+console.log('Risorse desktop preparate: 8 file da elenco chiuso.');
